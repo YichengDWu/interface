@@ -1,0 +1,14 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: format
+        name: format
+        entry: pixi run format
+        language: system
+        stages: [pre-commit]
+        files: \.mojo$
+    -   id: test
+        name: test
+        entry: pixi run test
+        language: system
+        stages: [pre-commit]

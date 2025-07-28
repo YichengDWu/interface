@@ -1,0 +1,13 @@
+[workspace]
+authors = ["YichengDWu <yichengdwu@outlook.com>"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "interface"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+test = "mojo test -I . test"
+format  = "mojo format ."
+
+[dependencies]
+max = ">=25.5.0.dev2025072805,<26"
