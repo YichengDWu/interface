@@ -10,4 +10,4 @@ test = "mojo test -I . test"
 format  = "mojo format ."
 
 [dependencies]
-max = ">=25.5.0.dev2025072805,<26"
+mojo = ">=25.6.0.dev2025083105,<26"

@@ -72,10 +72,7 @@ struct RegistryKey(KeyElement):
         self.value = SIMD[DType.uint64, 2](type_id1.id, type_id2.id)
 
     fn __eq__(self, other: Self) -> Bool:
-        return all((self.value == other.value))
-
-    fn __ne__(self, other: Self) -> Bool:
-        return not (self == other)
+        return self.value == other.value
 
     fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.value)
