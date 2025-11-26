@@ -1,12 +1,15 @@
 from .core import (
-    Interface,
-    DynObject,
+    Object,
     VTable,
-    TypeId,
-    GLOBAL_REGISTRY,
-    find_in_registry,
-    register_interface,
+    Any,
+    Interface,
+    ObjectPointer,
+    to_vtable,
+    type_id,
     trampoline,
 )
-
-from .interfaces import DynStringable
+from .interfaces import (
+    DynStringable,
+    DynSized,
+    DynHashable,
+)

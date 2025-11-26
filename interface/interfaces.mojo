@@ -1,24 +1,91 @@
-from .core import Interface, VTable
+from hashlib import Hasher
 
-
-fn str_trampoline[
-    return_type: AnyType, S: Stringable, //, func: fn (self: S) -> return_type
-](data: OpaquePointer) -> return_type:
-    return func(rebind[UnsafePointer[S]](data)[])
+from .core import (
+    Interface,
+    ObjectPointer,
+    VTable,
+    type_id,
+    to_vtable,
+    trampoline,
+)
 
 
 @register_passable("trivial")
 struct DynStringable(Interface, Stringable):
-    alias Trait = Stringable
-    var data: OpaquePointer
-    var vtable: VTable
+    comptime Trait = Stringable
 
-    fn __init__[T: Stringable](out self, data: UnsafePointer[T]):
-        self.data = data.bitcast[NoneType]()
-        self.vtable = VTable.alloc(1)
-        self.vtable.init_pointee_copy(
-            rebind[OpaquePointer](str_trampoline[T.__str__])
+    var _ptr: ObjectPointer
+    var _vtable: VTable
+
+    fn __init__[T: Stringable](out self, ptr: UnsafePointer[T, _]):
+        self._ptr = rebind[ObjectPointer](ptr)
+        self._vtable = Self.get_vtable[T]()
+
+    @staticmethod
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        comptime methods = (
+            type_id[T],
+            trampoline[T.__str__],
         )
+        return to_vtable[methods]()
 
+    @always_inline
     fn __str__(self) -> String:
-        return rebind[fn (OpaquePointer) -> String](self.vtable[0])(self.data)
+        return rebind[fn (ObjectPointer) -> String](self._vtable[1])(self._ptr)
+
+
+@register_passable("trivial")
+struct DynSized(Interface, Sized):
+    comptime Trait = Sized
+
+    var _ptr: ObjectPointer
+    var _vtable: VTable
+
+    fn __init__[T: Sized](out self, ptr: UnsafePointer[T, _]):
+        self._ptr = rebind[ObjectPointer](ptr)
+        self._vtable = Self.get_vtable[T]()
+
+    @staticmethod
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        comptime methods = (
+            type_id[T],
+            trampoline[T.__len__],
+        )
+        return to_vtable[methods]()
+
+    @always_inline
+    fn __len__(self) -> Int:
+        return rebind[fn (ObjectPointer) -> Int](self._vtable[1])(self._ptr)
+
+
+@always_inline
+fn hash_trampoline[
+    S: AnyType, //, func: fn[H: Hasher] (S, mut: H)
+](ptr: ObjectPointer, mut hasher: Some[Hasher]):
+    func(ptr.bitcast[S]()[], hasher)
+
+
+@register_passable("trivial")
+struct DynHashable(Hashable, Interface):
+    comptime Trait = Hashable
+
+    var _ptr: ObjectPointer
+    var _vtable: VTable
+
+    fn __init__[T: Hashable](out self, ptr: UnsafePointer[T, _]):
+        self._ptr = rebind[ObjectPointer](ptr)
+        self._vtable = Self.get_vtable[T]()
+
+    @staticmethod
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        comptime methods = (
+            type_id[T],
+            hash_trampoline[T.__hash__],
+        )
+        return to_vtable[methods]()
+
+    @always_inline
+    fn __hash__[H: Hasher](self, mut hasher: H):
+        return rebind[fn (ObjectPointer, mut: H)](self._vtable[1])(
+            self._ptr, hasher
+        )

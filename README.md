@@ -1,79 +1,135 @@
 # Dynamic Interfaces in Mojo
 
-This project provides a proof-of-concept implementation of a dynamic interface system in Mojo, similar to `std::any` in C++ or trait objects in Rust. It allows you to store objects of any type and dynamically cast them to specific interface types at runtime.
+This project provides a proof-of-concept implementation of a dynamic interface system in Mojo, similar to `std::any` in C++ or `Box<dyn Trait>` in Rust. It utilizes a global registry and vtables to allow storing objects of any type in a generic `Object` container and dynamically casting them to specific interfaces at runtime.
 
-## Core Concepts
+### Core Concepts
 
-*   **`Interface` Trait:** A base trait that all dynamic interfaces must implement.
-*   **`DynObject` Struct:** A type-erased container that holds a pointer to the data and a virtual function table (vtable).
-*   **`dyn_cast` Method:**  A method on `DynObject` that attempts to cast the stored object to a specified `Interface` type.
-*   **Global Registry:** A globally accessible registry that stores the vtables for different type-interface pairs.
-*   **`register_interface` Function:** A function to register a new type as an implementation of a specific interface.
+*   **`Object`**: A type-erased container (similar to `void*` or `Any`). It holds a pointer to the data and a basic vtable containing type information. It serves as the root of the dynamic system.
+*   **`Interface` Trait**: The base trait that all dynamic interface wrappers must implement. It mandates the storage of an object pointer and a vtable, and provides methods like `type_id()` and `dyn_cast()`.
+*   **`VTable` (Virtual Table)**: A static array of function pointers. Index 0 is reserved for the `type_id` function, while subsequent indices store pointers to implementation methods.
+*   **Global Registry (`INTERFACE_TABLE`)**: A compile-time global dictionary mapping `(InterfaceID, ConcreteTypeID)` to a specific `VTable`. This enables the runtime resolution of methods when casting.
 
-## How It Works
+### How It Works
 
-1.  **Type Erasure:** A `DynObject` is created from a value of any type. The `DynObject` stores a pointer to the value and a vtable. The vtable is a function pointer that, when called, can retrieve the correct vtable for a given interface type from the global registry.
+1.  **Type Erasure**: When you wrap a concrete struct (e.g., `Foo`) into an `Object`, the system stores the pointer and generates a minimal vtable.
+2.  **Registration**: You explicitly register which concrete types implement which interfaces using `register_interface`. This populates the global `INTERFACE_TABLE`.
+3.  **Dynamic Casting**: When calling `obj.dyn_cast[DynTrait]()`, the system:
+    *   Identifies the ID of the target interface (`DynTrait`) and the ID of the actual concrete type stored in `obj`.
+    *   Lookups this pair in the `INTERFACE_TABLE`.
+    *   If a match is found, it returns a new instance of `DynTrait` pointing to the original data but equipped with the correct VTable for that interface.
 
-2.  **Registration:** Before a `DynObject` can be cast to a specific interface, the underlying type must be registered as an implementer of that interface using the `register_interface` function. This function stores the vtable for the `(Type, Interface)` pair in the global registry.
+### Usage
 
-3.  **Dynamic Casting:** The `dyn_cast` method on `DynObject` takes an interface type as a generic argument. It queries the `DynObject`'s vtable with the `TypeId` of the requested interface. If a matching vtable is found in the registry, a new trait object for that interface is created and returned.
-
-## Usage
-
-Here's a simple example from `test/test_core.mojo`:
 
 ```mojo
 from interface import (
     Interface,
-    DynObject,
+    ObjectPointer,
     VTable,
-    trampoline,
+    type_id,
+    to_vtable,
     register_interface,
 )
-from testing import assert_equal, assert_true, assert_false
 
-# 1. Define an interface
+# 1. Define a trait
 trait Testable(Copyable, Movable):
-    fn test(self) -> UInt32:
-        pass
+    fn test(self) -> Int:
+        ...
 
-# 2. Define a dynamic version of the interface
+
+# 2. Define an interface for the trait
 @register_passable("trivial")
 struct DynTestable(Interface, Testable):
     alias Trait = Testable
-    var data: OpaquePointer
-    var vtable: VTable
 
-    fn __init__[T: Testable](out self, data: UnsafePointer[T]):
-        self.data = data.bitcast[NoneType]()
-        self.vtable = VTable.alloc(1)
-        self.vtable.init_pointee_copy(rebind[OpaquePointer](trampoline[T.test]))
+    var _ptr: ObjectPointer
+    var _vtable: VTable
 
-    fn test(self) -> UInt32:
-        return rebind[fn (OpaquePointer) -> UInt32](self.vtable[0])(self.data)
+    fn __init__[T: Self.Trait](out self, _ptr: UnsafePointer[T, _]):
+        self._ptr = rebind[ObjectPointer](_ptr)
+        self._vtable = Self.get_vtable[T]()
 
-# 3. Implement the interface for a concrete type
+    @staticmethod
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        # Define a trampoline to bridge the opaque pointer to the concrete method
+        fn test_trampoline(ptr: ObjectPointer) -> Int:
+            return ptr.bitcast[T]()[].test()
+        
+        comptime methods = (
+            type_id[T],
+            test_trampoline,
+        )
+        return to_vtable[methods]()
+
+    # The actual interface method calling the vtable
+    fn test(self) -> Int:
+        # Index 1 corresponds to `test_trampoline` above
+        return rebind[fn (ObjectPointer) -> Int](self._vtable[1])(self._ptr)
+
+
+# 3. Implement concrete types
+@fieldwise_init
+struct Foo(Testable):
+    var x: Int
+
+    fn test(self) -> Int:
+        return self.x
+
+
 @fieldwise_init
 struct Bar(Testable):
-    fn test(self) -> UInt32:
-        return 42
+    var x: Int
 
-# 4. Use the dynamic interface system
-def test_dynamic_register():
-    var bar = Bar()
-    var obj = DynObject(UnsafePointer(to=bar))
+    fn test(self) -> Int:
+        return self.x
 
-    # Initially, the cast fails because the interface is not registered
-    var dyn1 = obj.dyn_cast[DynTestable]()
-    assert_false(dyn1)
 
-    # Register the interface implementation
-    register_interface[DynTestable, Bar]()
+# 4. Main Logic
+def main():
+    var bar = Bar(6)
+    var foo = Foo(7)
 
-    # Now, the cast succeeds
-    var dyn2 = obj.dyn_cast[DynTestable]()
-    assert_true(dyn2)
-    assert_equal(dyn2.value().test(), 42)
+    var obj_list: List[DynTestable] = [
+        DynTestable(UnsafePointer(to=bar)),
+        DynTestable(UnsafePointer(to=foo)),
+    ]
+
+    for obj in obj_list:
+        print(obj.test())
+    # Expected output:
+    # 6
+    # 7
+
+    _ = bar 
+    _ = foo
+    
 ```
 
+### Enabling dynamic casting between interfaces
 
+To enable dynamic casting, call `register_interface`:
+
+```mojo
+from interface import DynStringable
+
+__extension Bar(Stringable):
+    fn __str__(self) -> String:
+        return "Bar with x = " + self.x.__str__()
+
+def main():
+    # ... existing code ...
+    register_interface[DynStringable, Bar]()
+
+    for obj in obj_list:
+        if dyn_str := obj.dyn_cast[DynStringable]():
+            print(dyn_str.value().__str__())
+        else:
+            print("Won't print")
+
+    # Expected Output:
+    # Bar with x = 6
+    # Won't print
+
+    _ = bar 
+    _ = foo
+```

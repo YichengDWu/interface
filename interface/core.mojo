@@ -1,114 +1,137 @@
 from compile import get_type_name
-from hashlib import Hasher
 from sys.ffi import _Global
+from builtin.rebind import downcast
+from hashlib import default_comp_time_hasher
 
-alias VTable = UnsafePointer[OpaquePointer]
+comptime TypeID = SIMD[DType.uint64, 1]
+comptime InterfaceTypeID = SIMD[DType.uint64, 2]
+comptime ObjectPointer = OpaquePointer[MutAnyOrigin]
+comptime MethodImpl = OpaquePointer[ImmutAnyOrigin]
+comptime StaticPointer[T: AnyType] = UnsafePointer[T, StaticConstantOrigin]
+comptime VTable = StaticPointer[MethodImpl]
+
+comptime INTERFACE_TABLE = _Global[
+    StorageType = Dict[InterfaceTypeID, VTable],
+    "INTERFACE_TABLE",
+    Dict[InterfaceTypeID, VTable].__init__,
+]
 
 
-@fieldwise_init
-@register_passable("trivial")
-struct TraitObject(Copyable, Defaultable, ExplicitlyCopyable, Movable):
-    var data: OpaquePointer
-    var vtable: VTable
-
-    fn __init__(out self):
-        self.data = OpaquePointer()
-        self.vtable = VTable()
+@always_inline
+fn type_id[T: AnyType]() -> TypeID:
+    comptime value = hash[HasherType=default_comp_time_hasher](
+        get_type_name[T, qualified_builtins=True]()
+    )
+    return value
 
 
-@register_passable("trivial")
-trait Interface(Copyable, Movable):
-    alias Trait: __type_of(AnyType)
+@always_inline
+fn global_constant_ptr[T: AnyType, //, value: T]() -> StaticPointer[T]:
+    return {__mlir_op.`pop.global_constant`[value=value]()}
 
-    # var data: OpaquePointer
+
+@always_inline
+fn to_vtable[methods: Tuple]() -> VTable:
+    return global_constant_ptr[methods]().bitcast[MethodImpl]()
+
+
+trait Interface(ImplicitlyCopyable, Movable):
+    comptime Trait: type_of(AnyType)
+
+    # var _ptr: ObjectPointer
     # var vtable: VTable
-    fn __init__[T: Self.Trait](out self, data: UnsafePointer[T]):
-        pass
 
-
-@register_passable("trivial")
-struct DynObject(Interface):
-    alias Trait = AnyType
-    var data: OpaquePointer
-    var vtable: VTable
-
-    fn __init__[T: AnyType](out self, data: UnsafePointer[T]):
-        self.data = data.bitcast[NoneType]()
-        self.vtable = VTable.alloc(1)
-        self.vtable.init_pointee_copy(
-            rebind[OpaquePointer](find_in_registry[T])
-        )
-
-    fn query_vtable(self, id: TypeId) -> Optional[VTable]:
-        return rebind[fn (TypeId) -> Optional[VTable]](self.vtable[0])(id)
-
-    fn dyn_cast[Iface: Interface](self) -> Optional[Iface]:
-        if vtable := self.query_vtable(TypeId.of[Iface]()):
-            var u = TraitObject(self.data, vtable.value())
-            return rebind[Iface](u)
-        return None
-
-
-fn vtable_for[Iface: Interface, Type: Iface.Trait]() -> VTable:
-    var x = Iface(UnsafePointer[Type]())
-    return rebind[TraitObject](x).vtable
-
-
-@fieldwise_init
-@register_passable("trivial")
-struct TypeId:
-    var id: UInt64
+    fn __init__[T: Self.Trait](out self, ptr: UnsafePointer[T, _]):
+        ...
+        # self._ptr = rebind[ObjectPointer](ptr)
+        # self._vtable = Self.get_vtable[T]()
 
     @staticmethod
-    fn of[T: AnyType]() -> TypeId:
-        return {hash(get_type_name[T]())}
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        ...
 
+    @always_inline
+    fn get_ptr(self) -> ObjectPointer:
+        return rebind[Object](self)._ptr
 
-@register_passable("trivial")
-struct RegistryKey(KeyElement):
-    var value: SIMD[DType.uint64, 2]
+    @always_inline
+    fn get_vtable(self) -> VTable:
+        return rebind[Object](self)._vtable
 
-    fn __init__(out self, type_id1: TypeId, type_id2: TypeId):
-        self.value = SIMD[DType.uint64, 2](type_id1.id, type_id2.id)
+    @always_inline
+    fn type_id(self) -> TypeID:
+        return rebind[fn () -> TypeID](self.get_vtable()[0])()
 
-    fn __eq__(self, other: Self) -> Bool:
-        return self.value == other.value
-
-    fn __hash__[H: Hasher](self, mut hasher: H):
-        hasher.update(self.value)
+    fn dyn_cast[Iface: Interface](self) raises -> Optional[Iface]:
+        var vtable = lookup_interface(type_id[Iface](), self.type_id())
+        if not vtable:
+            return None
+        return {rebind[Iface](Object(self.get_ptr(), vtable.value()))}
 
 
 @fieldwise_init
-struct Registry(Copyable, Movable):
-    var entries: Dict[RegistryKey, VTable]
+@register_passable("trivial")
+struct Object(Interface):
+    comptime Trait = AnyType
+    var _ptr: ObjectPointer
+    var _vtable: VTable
 
-    fn register[Iface: AnyType, Type: AnyType](mut self, vtable: VTable):
-        self.entries[
-            RegistryKey(TypeId.of[Type](), TypeId.of[Iface]())
-        ] = vtable
+    fn __init__[T: Self.Trait](out self, ptr: UnsafePointer[T, _]):
+        self._ptr = rebind[ObjectPointer](ptr)
+        self._vtable = Self.get_vtable[T]()
 
-    fn find[Type: AnyType](self, trait_id: TypeId) -> Optional[VTable]:
-        return self.entries.get(RegistryKey(TypeId.of[Type](), trait_id))
+    fn __init__[T: Self.Trait](out self, ref data: T):
+        self = Self(UnsafePointer(to=data))
 
-
-fn create_registry() -> Registry:
-    return Registry(Dict[RegistryKey, VTable]())
-
-
-alias GLOBAL_REGISTRY = _Global["GLOBAL_REGISTRY", Registry, create_registry]
-
-
-fn find_in_registry[Type: AnyType](trait_id: TypeId) -> Optional[VTable]:
-    return GLOBAL_REGISTRY.get_or_create_ptr()[].find[Type](trait_id)
+    @always_inline
+    @staticmethod
+    fn get_vtable[T: Self.Trait]() -> VTable:
+        comptime methods = (type_id[T],)
+        return to_vtable[methods]()
 
 
-fn register_interface[Iface: Interface, Type: Iface.Trait]():
-    var global_registry_ptr = GLOBAL_REGISTRY.get_or_create_ptr()
-    global_registry_ptr[].register[Type, Type](VTable())
-    global_registry_ptr[].register[Iface, Type](vtable_for[Iface, Type]())
+fn register_interface[
+    Iface: Interface,
+    Type: Iface.Trait,
+]() raises:
+    comptime interface_name = get_type_name[Iface]()
+    comptime type_name = get_type_name[downcast[AnyType, Type]]()
+
+    comptime interface_type_id = SIMD[DType.uint64, 2](
+        type_id[Iface](), type_id[Type]()
+    )
+    var vtable = Iface.get_vtable[Type]()
+
+    var interface_table = INTERFACE_TABLE.get_or_create_ptr()
+    if interface_type_id in interface_table[]:
+        raise Error(
+            "VTable for interface: ",
+            interface_name,
+            "\n and type: ",
+            type_name,
+            "\n is already registered.",
+        )
+    interface_table[][interface_type_id] = vtable
 
 
+@always_inline
+fn lookup_interface[
+    Iface: Interface,
+    Type: Iface.Trait,
+]() raises -> Optional[VTable]:
+    return lookup_interface(type_id[Iface](), type_id[Type]())
+
+
+fn lookup_interface(
+    interface_id: TypeID, type_id: TypeID
+) raises -> Optional[VTable]:
+    var interface_type_id = SIMD[DType.uint64, 2](interface_id, type_id)
+    var interface_table = INTERFACE_TABLE.get_or_create_ptr()
+    return interface_table[].find(interface_type_id)
+
+
+@always_inline
 fn trampoline[
-    return_type: AnyType, S: Movable, //, func: fn (self: S) -> return_type
-](data: OpaquePointer) -> return_type:
-    return func(rebind[UnsafePointer[S]](data)[])
+    return_type: AnyType, S: AnyType, //, func: fn (S) -> return_type
+](ptr: ObjectPointer) -> return_type:
+    return func(ptr.bitcast[S]()[])

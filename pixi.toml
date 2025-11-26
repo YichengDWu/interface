@@ -1,13 +1,28 @@
 [workspace]
-authors = ["YichengDWu <yichengdwu@outlook.com>"]
+authors = ["Yicheng Wu <yichengdwu@outlook.com>"]
 channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+preview = ["pixi-build"]
+
+[package]
 name = "interface"
-platforms = ["linux-64"]
-version = "0.1.0"
+version = "0.2.0"
+
+[package.build]
+backend = { name = "pixi-build-mojo", version = "0.*" }
 
 [tasks]
-test = "mojo test -I . test"
-format  = "mojo format ."
+test = "bash run_tests.sh test"
+format = "mojo format interface test"
+
+[package.host-dependencies]
+mojo = ">=0.26.1.0.dev2025112205,<0.27"
+
+[package.build-dependencies]
+mojo = ">=0.26.1.0.dev2025112205,<0.27"
+
+[package.run-dependencies]
+mojo = ">=0.26.1.0.dev2025112205,<0.27"
 
 [dependencies]
-mojo = ">=25.6.0.dev2025083105,<26"
+mojo = ">=0.26.1.0.dev2025112516,<0.27"
