@@ -1,7 +1,6 @@
 from .core import (
     Object,
     VTable,
-    Any,
     Interface,
     ObjectPointer,
     to_vtable,

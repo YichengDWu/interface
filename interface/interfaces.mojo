@@ -17,7 +17,7 @@ struct DynStringable(Interface, Stringable):
     var _ptr: ObjectPointer
     var _vtable: VTable
 
-    fn __init__[T: Stringable](out self, ptr: UnsafePointer[T, _]):
+    fn __init__[T: Self.Trait](out self, ptr: UnsafePointer[T, _]):
         self._ptr = rebind[ObjectPointer](ptr)
         self._vtable = Self.get_vtable[T]()
 
@@ -41,7 +41,7 @@ struct DynSized(Interface, Sized):
     var _ptr: ObjectPointer
     var _vtable: VTable
 
-    fn __init__[T: Sized](out self, ptr: UnsafePointer[T, _]):
+    fn __init__[T: Self.Trait](out self, ptr: UnsafePointer[T, _]):
         self._ptr = rebind[ObjectPointer](ptr)
         self._vtable = Self.get_vtable[T]()
 
@@ -72,7 +72,7 @@ struct DynHashable(Hashable, Interface):
     var _ptr: ObjectPointer
     var _vtable: VTable
 
-    fn __init__[T: Hashable](out self, ptr: UnsafePointer[T, _]):
+    fn __init__[T: Self.Trait](out self, ptr: UnsafePointer[T, _]):
         self._ptr = rebind[ObjectPointer](ptr)
         self._vtable = Self.get_vtable[T]()
 
