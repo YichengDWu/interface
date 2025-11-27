@@ -19,7 +19,7 @@ from testing import (
 )
 
 
-trait Foo:
+trait Foo(Copyable, Movable):
     fn foo(self) -> Int:
         ...
 
@@ -45,7 +45,6 @@ __extension B(Stringable):
         return "B with x = " + self.x.__str__()
 
 
-@register_passable("trivial")
 struct AnyFoo(Foo, Interface):
     comptime Trait = Foo
 
@@ -70,32 +69,32 @@ struct AnyFoo(Foo, Interface):
 
 def test_type_id_uniqueness():
     var a = A(0)
-    var obj_a = Object(a)
+    var obj_a = Object(a^)
     var type_id_1 = obj_a.type_id()
 
     var a2 = A(0)
-    var obj_a2 = Object(a2)
+    var obj_a2 = Object(a2^)
     var type_id_2 = obj_a2.type_id()
 
     assert_equal(type_id_1, type_id_2)
     assert_equal(type_id[A](), type_id_1)
     assert_not_equal(type_id[A](), type_id[B]())
 
-    _ = a
-    _ = a2
+    obj_a.free()
+    obj_a2.free()
 
 
 def test_vtable_uniqueness():
     var a = A(0)
-    var obj_a = Object(a)
+    var obj_a = Object(a^)
 
     var a2 = A(0)
-    var obj_a2 = Object(a2)
+    var obj_a2 = Object(a2^)
 
     assert_equal(obj_a._vtable, obj_a2._vtable)
 
-    _ = a
-    _ = a2
+    obj_a.free()
+    obj_a2.free()
 
 
 def test_interface_dynamic_dispatch():

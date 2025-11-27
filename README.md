@@ -38,7 +38,6 @@ trait Testable(Copyable, Movable):
 
 
 # 2. Define an interface for the trait
-@register_passable("trivial")
 struct AnyTestable(Interface, Testable):
     alias Trait = Testable
 

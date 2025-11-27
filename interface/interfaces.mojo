@@ -7,6 +7,7 @@ from .core import (
     type_id,
     to_vtable,
     trampoline,
+    del_trampoline
 )
 
 
@@ -24,13 +25,14 @@ struct AnyStringable(Interface, Stringable):
     fn get_vtable[T: Self.Trait]() -> VTable:
         comptime methods = (
             type_id[T],
+            del_trampoline[T],
             trampoline[T.__str__],
         )
         return to_vtable[methods]()
 
     @always_inline
     fn __str__(self) -> String:
-        return rebind[fn (ObjectPointer) -> String](self._vtable[1])(self._ptr)
+        return rebind[fn (ObjectPointer) -> String](self._vtable[2])(self._ptr)
 
 
 struct AnySized(Interface, Sized):
@@ -47,13 +49,14 @@ struct AnySized(Interface, Sized):
     fn get_vtable[T: Self.Trait]() -> VTable:
         comptime methods = (
             type_id[T],
+            del_trampoline[T],
             trampoline[T.__len__],
         )
         return to_vtable[methods]()
 
     @always_inline
     fn __len__(self) -> Int:
-        return rebind[fn (ObjectPointer) -> Int](self._vtable[1])(self._ptr)
+        return rebind[fn (ObjectPointer) -> Int](self._vtable[2])(self._ptr)
 
 
 @always_inline
@@ -77,12 +80,13 @@ struct AnyHashable(Hashable, Interface):
     fn get_vtable[T: Self.Trait]() -> VTable:
         comptime methods = (
             type_id[T],
+            del_trampoline[T],
             hash_trampoline[T.__hash__],
         )
         return to_vtable[methods]()
 
     @always_inline
     fn __hash__[H: Hasher](self, mut hasher: H):
-        return rebind[fn (ObjectPointer, mut: H)](self._vtable[1])(
+        return rebind[fn (ObjectPointer, mut: H)](self._vtable[2])(
             self._ptr, hasher
         )

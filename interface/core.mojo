@@ -36,6 +36,18 @@ fn to_vtable[methods: Tuple]() -> VTable:
 
 
 trait Interface(ImplicitlyCopyable, Movable):
+    """A base interface trait for all interfaces.
+    Conventionally, an interface struct should have the following layout:
+        var : ObjectPointer
+        var : VTable
+
+    The `VTable` should have the following layout:
+        Index 0: type_id function
+        Index 1: free function
+        Index 2..N: method of Self.Trait
+
+    """
+
     comptime Trait: type_of(AnyType)
 
     # var _ptr: ObjectPointer
@@ -61,6 +73,10 @@ trait Interface(ImplicitlyCopyable, Movable):
     @always_inline
     fn type_id(self) -> TypeID:
         return rebind[fn () -> TypeID](self.get_vtable()[0])()
+
+    @always_inline
+    fn free(deinit self):
+        rebind[fn (ObjectPointer)](self.get_vtable()[1])(self.get_ptr())
 
     fn dyn_cast[Iface: Interface](self) raises -> Optional[Iface]:
         var vtable = lookup_interface(type_id[Iface](), self.type_id())
@@ -90,9 +106,6 @@ struct Object(Interface):
     fn get_vtable[T: Self.Trait]() -> VTable:
         comptime methods = (type_id[T], del_trampoline[T])
         return to_vtable[methods]()
-
-    fn free(deinit self):
-        rebind[fn (ObjectPointer)](self._vtable[1])(self._ptr)
 
 
 fn register_interface[
@@ -143,7 +156,6 @@ fn trampoline[
 
 
 fn del_trampoline[T: AnyType](ptr: ObjectPointer):
-    # var data_ptr = ptr.bitcast[T]()
-    print("Called!")
-    # data_ptr.destroy_pointee()
-    # data_ptr.free()
+    var data_ptr = ptr.bitcast[T]()
+    data_ptr.destroy_pointee()
+    data_ptr.free()
