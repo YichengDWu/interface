@@ -13,10 +13,10 @@ This project provides a proof-of-concept implementation of a dynamic interface s
 
 1.  **Type Erasure**: When you wrap a concrete struct (e.g., `Foo`) into an `Object`, the system stores the pointer and generates a minimal vtable.
 2.  **Registration**: You explicitly register which concrete types implement which interfaces using `register_interface`. This populates the global `INTERFACE_TABLE`.
-3.  **Dynamic Casting**: When calling `obj.dyn_cast[DynTrait]()`, the system:
-    *   Identifies the ID of the target interface (`DynTrait`) and the ID of the actual concrete type stored in `obj`.
+3.  **Dynamic Casting**: When calling `obj.dyn_cast[AnyTrait]()`, the system:
+    *   Identifies the ID of the target interface (`AnyTrait`) and the ID of the actual concrete type stored in `obj`.
     *   Lookups this pair in the `INTERFACE_TABLE`.
-    *   If a match is found, it returns a new instance of `DynTrait` pointing to the original data but equipped with the correct VTable for that interface.
+    *   If a match is found, it returns a new instance of `AnyTrait` pointing to the original data but equipped with the correct VTable for that interface.
 
 ### Usage
 
