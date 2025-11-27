@@ -6,7 +6,7 @@ from hashlib import default_comp_time_hasher
 comptime TypeID = SIMD[DType.uint64, 1]
 comptime InterfaceTypeID = SIMD[DType.uint64, 2]
 comptime ObjectPointer = OpaquePointer[MutOrigin.external]
-comptime MethodImpl = OpaquePointer[ImmutAnyOrigin]
+comptime MethodImpl = OpaquePointer[ImmutOrigin.external]
 comptime StaticPointer[T: AnyType] = UnsafePointer[T, StaticConstantOrigin]
 comptime VTable = StaticPointer[MethodImpl]
 
