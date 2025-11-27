@@ -1,4 +1,4 @@
-# Dynamic Interfaces in Mojo
+# Anyamic Interfaces in Mojo
 
 This project provides a proof-of-concept implementation of a dynamic interface system in Mojo, similar to `std::any` in C++ or `Box<dyn Trait>` in Rust. It utilizes a global registry and vtables to allow storing objects of any type in a generic `Object` container and dynamically casting them to specific interfaces at runtime.
 
@@ -13,10 +13,10 @@ This project provides a proof-of-concept implementation of a dynamic interface s
 
 1.  **Type Erasure**: When you wrap a concrete struct (e.g., `Foo`) into an `Object`, the system stores the pointer and generates a minimal vtable.
 2.  **Registration**: You explicitly register which concrete types implement which interfaces using `register_interface`. This populates the global `INTERFACE_TABLE`.
-3.  **Dynamic Casting**: When calling `obj.dyn_cast[DynTrait]()`, the system:
-    *   Identifies the ID of the target interface (`DynTrait`) and the ID of the actual concrete type stored in `obj`.
+3.  **Anyamic Casting**: When calling `obj.dyn_cast[AnyTrait]()`, the system:
+    *   Identifies the ID of the target interface (`AnyTrait`) and the ID of the actual concrete type stored in `obj`.
     *   Lookups this pair in the `INTERFACE_TABLE`.
-    *   If a match is found, it returns a new instance of `DynTrait` pointing to the original data but equipped with the correct VTable for that interface.
+    *   If a match is found, it returns a new instance of `AnyTrait` pointing to the original data but equipped with the correct VTable for that interface.
 
 ### Usage
 
@@ -39,7 +39,7 @@ trait Testable(Copyable, Movable):
 
 # 2. Define an interface for the trait
 @register_passable("trivial")
-struct DynTestable(Interface, Testable):
+struct AnyTestable(Interface, Testable):
     alias Trait = Testable
 
     var _ptr: ObjectPointer
@@ -89,9 +89,9 @@ def main():
     var bar = Bar(6)
     var foo = Foo(7)
 
-    var obj_list: List[DynTestable] = [
-        DynTestable(UnsafePointer(to=bar)),
-        DynTestable(UnsafePointer(to=foo)),
+    var obj_list: List[AnyTestable] = [
+        AnyTestable(UnsafePointer(to=bar)),
+        AnyTestable(UnsafePointer(to=foo)),
     ]
 
     for obj in obj_list:
@@ -110,7 +110,7 @@ def main():
 To enable dynamic casting, call `register_interface`:
 
 ```mojo
-from interface import DynStringable
+from interface import AnyStringable
 
 __extension Bar(Stringable):
     fn __str__(self) -> String:
@@ -118,10 +118,10 @@ __extension Bar(Stringable):
 
 def main():
     # ... existing code ...
-    register_interface[DynStringable, Bar]()
+    register_interface[AnyStringable, Bar]()
 
     for obj in obj_list:
-        if dyn_str := obj.dyn_cast[DynStringable]():
+        if dyn_str := obj.dyn_cast[AnyStringable]():
             print(dyn_str.value().__str__())
         else:
             print("Won't print")

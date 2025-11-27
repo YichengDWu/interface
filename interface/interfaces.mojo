@@ -11,7 +11,7 @@ from .core import (
 
 
 @register_passable("trivial")
-struct DynStringable(Interface, Stringable):
+struct AnyStringable(Interface, Stringable):
     comptime Trait = Stringable
 
     var _ptr: ObjectPointer
@@ -35,7 +35,7 @@ struct DynStringable(Interface, Stringable):
 
 
 @register_passable("trivial")
-struct DynSized(Interface, Sized):
+struct AnySized(Interface, Sized):
     comptime Trait = Sized
 
     var _ptr: ObjectPointer
@@ -66,7 +66,7 @@ fn hash_trampoline[
 
 
 @register_passable("trivial")
-struct DynHashable(Hashable, Interface):
+struct AnyHashable(Hashable, Interface):
     comptime Trait = Hashable
 
     var _ptr: ObjectPointer

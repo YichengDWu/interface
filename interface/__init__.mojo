@@ -8,7 +8,7 @@ from .core import (
     trampoline,
 )
 from .interfaces import (
-    DynStringable,
-    DynSized,
-    DynHashable,
+    AnyStringable,
+    AnySized,
+    AnyHashable,
 )
