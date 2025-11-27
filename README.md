@@ -29,6 +29,7 @@ from interface import (
     type_id,
     to_vtable,
     register_interface,
+    del_trampoline
 )
 
 # 1. Define a trait
@@ -56,6 +57,7 @@ struct AnyTestable(Interface, Testable):
         
         comptime methods = (
             type_id[T],
+            del_trampoline[T],
             test_trampoline,
         )
         return to_vtable[methods]()
@@ -63,7 +65,7 @@ struct AnyTestable(Interface, Testable):
     # The actual interface method calling the vtable
     fn test(self) -> Int:
         # Index 1 corresponds to `test_trampoline` above
-        return rebind[fn (ObjectPointer) -> Int](self._vtable[1])(self._ptr)
+        return rebind[fn (ObjectPointer) -> Int](self._vtable[2])(self._ptr)
 
 
 # 3. Implement concrete types
