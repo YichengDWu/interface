@@ -70,9 +70,8 @@ trait Interface(ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-@register_passable("trivial")
 struct Object(Interface):
-    comptime Trait = AnyType
+    comptime Trait = Movable
     var _ptr: ObjectPointer
     var _vtable: VTable
 
@@ -80,14 +79,20 @@ struct Object(Interface):
         self._ptr = rebind[ObjectPointer](ptr)
         self._vtable = Self.get_vtable[T]()
 
-    fn __init__[T: Self.Trait](out self, ref data: T):
-        self = Self(UnsafePointer(to=data))
+    fn __init__[T: Self.Trait](out self, var value: T):
+        var ptr = alloc[T](1)
+        ptr.init_pointee_move(value^)
+        self._ptr = rebind[ObjectPointer](ptr)
+        self._vtable = Self.get_vtable[T]()
 
     @always_inline
     @staticmethod
     fn get_vtable[T: Self.Trait]() -> VTable:
-        comptime methods = (type_id[T],)
+        comptime methods = (type_id[T], del_trampoline[T])
         return to_vtable[methods]()
+
+    fn free(deinit self):
+        rebind[fn (ObjectPointer)](self._vtable[1])(self._ptr)
 
 
 fn register_interface[
@@ -135,3 +140,10 @@ fn trampoline[
     return_type: AnyType, S: AnyType, //, func: fn (S) -> return_type
 ](ptr: ObjectPointer) -> return_type:
     return func(ptr.bitcast[S]()[])
+
+
+fn del_trampoline[T: AnyType](ptr: ObjectPointer):
+    # var data_ptr = ptr.bitcast[T]()
+    print("Called!")
+    # data_ptr.destroy_pointee()
+    # data_ptr.free()

@@ -10,7 +10,6 @@ from .core import (
 )
 
 
-@register_passable("trivial")
 struct AnyStringable(Interface, Stringable):
     comptime Trait = Stringable
 
@@ -34,7 +33,6 @@ struct AnyStringable(Interface, Stringable):
         return rebind[fn (ObjectPointer) -> String](self._vtable[1])(self._ptr)
 
 
-@register_passable("trivial")
 struct AnySized(Interface, Sized):
     comptime Trait = Sized
 
@@ -65,7 +63,6 @@ fn hash_trampoline[
     func(ptr.bitcast[S]()[], hasher)
 
 
-@register_passable("trivial")
 struct AnyHashable(Hashable, Interface):
     comptime Trait = Hashable
 

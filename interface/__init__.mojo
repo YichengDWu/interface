@@ -6,7 +6,9 @@ from .core import (
     to_vtable,
     type_id,
     trampoline,
+    del_trampoline,
 )
+
 from .interfaces import (
     AnyStringable,
     AnySized,
