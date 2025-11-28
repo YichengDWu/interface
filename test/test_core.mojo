@@ -152,5 +152,26 @@ def test_dyn_cast():
     _ = b
 
 
+def test_multi_interface_casting():
+    register_interface[AnyStringable, B]()
+    register_interface[AnyFoo, B]()
+    var b = B(10)
+
+    var obj_b = AnyFoo(UnsafePointer(to=b))
+
+    # AnyFoo -> AnyStringable
+    var as_stringable = obj_b.dyn_cast[AnyStringable]()
+    assert_true(as_stringable)
+    assert_equal(as_stringable.value().__str__(), "B with x = 10")
+
+    # AnyStringable -> AnyFoo
+    if as_stringable:
+        var back_to_foo = as_stringable.value().dyn_cast[AnyFoo]()
+        assert_true(back_to_foo)
+        assert_equal(back_to_foo.value().foo(), 10)
+
+    _ = b
+
+
 def main():
     TestSuite.discover_tests[__functions_in_module()]().run()
