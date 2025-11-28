@@ -37,15 +37,15 @@ fn to_vtable[methods: Tuple]() -> VTable:
 
 trait Interface(ImplicitlyCopyable, Movable):
     """A base interface trait for all interfaces.
+
     Conventionally, an interface struct should have the following layout:
         var : ObjectPointer
         var : VTable
 
     The `VTable` should have the following layout:
-        Index 0: type_id function
-        Index 1: free function
-        Index 2..N: method of Self.Trait
-
+        Index 0: `type_id` function.
+        Index 1: `__del__` function.
+        Index 2..N: methods of Self.Trait.
     """
 
     comptime Trait: type_of(AnyType)
@@ -157,5 +157,8 @@ fn trampoline[
 
 fn del_trampoline[T: AnyType](ptr: ObjectPointer):
     var data_ptr = ptr.bitcast[T]()
-    data_ptr.destroy_pointee()
+
+    @parameter
+    if not T.__del__is_trivial:
+        data_ptr.destroy_pointee()
     data_ptr.free()
