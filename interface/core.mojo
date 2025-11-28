@@ -121,14 +121,14 @@ fn register_interface[
     var vtable = Iface.get_vtable[Type]()
 
     var interface_table = INTERFACE_TABLE.get_or_create_ptr()
-    if interface_type_id in interface_table[]:
-        raise Error(
-            "VTable for interface: ",
-            interface_name,
-            "\n and type: ",
-            type_name,
-            "\n is already registered.",
-        )
+    #if interface_type_id in interface_table[]:
+    #    raise Error(
+    #        "VTable for interface: ",
+    #        interface_name,
+    #        "\n and type: ",
+    #        type_name,
+    #        "\n is already registered.",
+    #    )
     interface_table[][interface_type_id] = vtable
 
 
