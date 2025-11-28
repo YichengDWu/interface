@@ -7,7 +7,7 @@ from .core import (
     type_id,
     to_vtable,
     trampoline,
-    del_trampoline
+    del_trampoline,
 )
 
 
