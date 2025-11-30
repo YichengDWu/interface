@@ -10,6 +10,21 @@ By utilizing a global registry and vtables, this library allows you to:
 
 -----
 
+## Installation
+
+To use this library in your Mojo project using [pixi](https://prefix.dev/), you need to configure your project manifest `pixi.toml`.
+
+```toml
+[workspace]
+# ... other workspace config
+preview = ["pixi-build"]
+
+[dependencies]
+# ... other dependencies
+interface = { git = "https://github.com/YichengDWu/interface.git" }
+
+-----
+
 ## Core Concepts
 
 To bridge Mojo's static typing with runtime dynamism, we use four key components:
