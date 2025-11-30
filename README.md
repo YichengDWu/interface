@@ -141,18 +141,23 @@ def main():
 
 ## Memory Management Models
 
-This library supports two distinct memory models depending on your needs.
+### **Model A: Unsafe View & Manual Management**
 
-### Model A: Manual Management (Borrowed or Explicit Free)
+**Best for:** Temporary views, zero-copy performance, and interoperability with external memory.
 
-*Best for: Temporary views, performance-critical code, or manual lifecycle control.*
+In this model, the Interface acts as a **non-owning "Unsafe View"** (similar to an `UnsafePointer`). It does **not** implement `__del__` to manage the lifecycle of the underlying data.
 
-In this model, the wrapper acts as a "dumb" pointer holder. It does not implement `__del__`.
+* **Borrowing & ASAP Safety:**
+    * When wrapping an existing object (whether it lives on the stack or manages heap memory), you are subject to Mojo's **ASAP (As Soon As Possible) destruction** policy.
+    * **The Risk:** The compiler may destroy the **Owner** (the original variable) immediately after you take the pointer, even if your Interface wrapper is still in use.
+    * **Action Required:** You must treat the Interface like an `UnsafePointer` and manually extend the lifetime of the Owner (e.g., using `_ = owner`) to ensure the data remains valid throughout the Interface's usage.
 
-* **Stack Borrowing**: If you wrap a pointer to a stack variable, simply let the wrapper go out of scope. Do not call free.
-* **Manual Heap Allocation**: If you manually alloc memory and pass it to the wrapper, you must explicitly call `.free()` to avoid leaks.
+* **Manual Raw Allocation:**
+    * If you manually allocate memory (e.g., via `alloc`) and pass it to the wrapper, no Mojo variable owns this memory.
+    * In this case, you are responsible for explicit cleanup. You must call `.free()` manually when appropriate to avoid memory leaks.
 
-**Note on `.free()`**: The Interface trait includes a default `.free()` method. This method works by invoking the function pointer at **Index 1** of the VTable. You must ensure the desctructor is registered at this index for manual freeing to work.
+> **Note on `.free()`:** The `Interface` trait includes a default `.free()` method. This method executes the function pointer registered at **Index 1** of the VTable. Ensure a valid destructor is registered at this index if you intend to use manual freeing.
+
 
 ```mojo
 # Example of Manual Heap Management
